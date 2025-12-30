@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "MyDegrees Enhancer",
+  "version": "0.1.0",
+  "description": "Quality-of-life improvements for OSU MyDegrees.",
+  "icons": {},
+  "action": {
+    "default_title": "MyDegrees Enhancer",
+    "default_popup": "ui/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mydegrees.oregonstate.edu/*"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["data/courses.json"],
+      "matches": ["https://mydegrees.oregonstate.edu/*"]
+    }
+  ]
+}
