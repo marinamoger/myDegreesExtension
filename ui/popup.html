@@ -8,7 +8,18 @@
   </head>
   <body>
     <h1>MyDegrees Enhancer</h1>
-    <p>Status: <span id="status">Loaded</span></p>
+    <label class="row">
+        <input id="toggle" type="checkbox" />
+        <span> Show full course titles</span>
+    </label>
+    <label class="row">
+        <input id="toggle-prereqs" type="checkbox" />
+        <span> Show prerequisite warnings</span>
+    </label>
+    <label class="row">
+        <input id="toggle-notes" type="checkbox" />
+        <span> Make notes visible</span>
+    </label>
     <script src="popup.js"></script>
   </body>
 </html>

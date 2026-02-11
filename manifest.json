@@ -3,6 +3,7 @@
   "name": "MyDegrees Enhancer",
   "version": "0.1.0",
   "description": "Quality-of-life improvements for OSU MyDegrees.",
+  "permissions": ["storage"],
   "icons": {},
   "action": {
     "default_title": "MyDegrees Enhancer",
@@ -11,7 +12,14 @@
   "content_scripts": [
     {
       "matches": ["https://mydegrees.oregonstate.edu/*"],
-      "js": ["content/content.js"],
+      "js": [
+      "content/shared.js",
+      "content/features/feature_titles.js",
+      "content/features/feature_prereqs.js",
+      "content/features/feature_notes.js",
+      "content/content.js"
+      ],
+      "css": ["content/styles.css"],
       "run_at": "document_idle"
     }
   ],

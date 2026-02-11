@@ -1,0 +1,117 @@
+/* Full course title shown under course code */
+html.mde-enabled .mde-course-title {
+  display: block;
+  font-family: "Noto Sans", Helvetica, Arial, sans-serif;
+  color: inherit;
+  font-size: 0.78em;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+/* Dark mode: slightly higher opacity so it stays readable */
+@media (prefers-color-scheme: dark) {
+  html.mde-enabled .mde-course-title {
+    opacity: 0.85;
+  }
+}
+
+/* When disabled, hide injected lines without removing them */
+html:not(.mde-enabled) .mde-course-title {
+  display: none;
+}
+
+/* Prerequisite warning badge */
+.mde-prereq-badge {
+  position: absolute;
+  right: 10px;
+
+  top: 50%;
+  transform: translateY(-50%);
+
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-family: "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+
+  background-color: #d32f2f;
+  color: #fff;
+
+  cursor: help;
+  z-index: 10;
+}
+
+
+.mde-prereq-badge::after {
+  content: attr(data-tooltip);
+
+  position: absolute;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  min-width: 260px;
+  max-width: 360px;
+
+  padding: 12px 14px;
+  border-radius: 10px;
+
+  background: rgb(252, 207, 144);
+  color: #000000;
+
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+
+  white-space: normal;
+  text-align: left;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.mde-prereq-badge:hover::after {
+  opacity: 1;
+}
+
+
+/* Dark mode tweak */
+@media (prefers-color-scheme: dark) {
+  .mde-prereq-badge {
+    background-color: #ef5350;
+  }
+
+}
+
+/* Inline notes shown on course cards (to the left of the note icon, under divider) */
+.mde-note-inline {
+  position: absolute;
+  left: 10px;
+  right: 44px; /* leave space for the note icon on the bottom-right */
+  bottom: 10px;
+
+  padding: 6px 8px;
+  border-radius: 10px;
+
+  font-family: "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.25;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mde-note-inline {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
