@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const toggle = document.getElementById("toggle");
   const prereqToggle = document.getElementById("toggle-prereqs");
   const notesToggle = document.getElementById("toggle-notes");
+  const lockToggle = document.getElementById("toggle-lockcards");
   // Load saved settings
   const { mdeEnabled = true, mdePrereqsEnabled = true } =
     await chrome.storage.sync.get({ mdeEnabled: true, mdePrereqsEnabled: true });
@@ -63,5 +64,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     chrome.tabs.sendMessage(tabId, { type: "MDE_SET_NOTES_ENABLED", enabled });
   });
 
+  // Lock cards toggle
+  const { mdeLockCardsEnabled = true } = await chrome.storage.sync.get({
+    mdeLockCardsEnabled: true,
+  });
+  lockToggle.checked = mdeLockCardsEnabled;
+
+  lockToggle.addEventListener("change", async () => {
+    const enabled = lockToggle.checked;
+
+    await chrome.storage.sync.set({ mdeLockCardsEnabled: enabled });
+
+    const tabId = await getActiveTabId();
+    if (!tabId) return;
+    chrome.tabs.sendMessage(tabId, { type: "MDE_SET_LOCKCARDS_ENABLED", enabled });
+  });
 });
 

@@ -17,15 +17,21 @@
       "content/features/feature_titles.js",
       "content/features/feature_prereqs.js",
       "content/features/feature_notes.js",
+      "content/features/feature_lockcards.js",
       "content/content.js"
       ],
       "css": ["content/styles.css"],
       "run_at": "document_idle"
     }
   ],
+  
   "web_accessible_resources": [
     {
-      "resources": ["data/courses.json"],
+      "resources": [
+        "data/courses.json",
+        "assets/lock.png",
+        "assets/unlock.png"
+      ],
       "matches": ["https://mydegrees.oregonstate.edu/*"]
     }
   ]

@@ -19,3 +19,15 @@ h1 {
   align-items: center;
   gap: 8px;
 }
+
+.toggle-group {
+  margin-bottom: 12px;
+}
+
+.toggle-subtext {
+  font-size: 12px;
+  color: #666;
+  margin-left: 26px; /* aligns under label text, not checkbox */
+  margin-top: 2px;
+  line-height: 1.3;
+}

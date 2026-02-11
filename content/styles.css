@@ -115,3 +115,33 @@ html:not(.mde-enabled) .mde-course-title {
   }
 }
 
+/* Lock button on each course card */
+.mde-lock-btn {
+  position: absolute;
+  top: 6px;
+  right: 30px; /* space from 3-dot menu */
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.mde-lock-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  .mde-lock-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.mde-lock-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+
