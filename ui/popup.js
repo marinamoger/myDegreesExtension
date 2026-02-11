@@ -1,83 +1,74 @@
 /**
- * Gets tab id of the active tab in the current window.
- * @returns {Promise<number|undefined>} The ID of the active tab, or undefined if no active tab is found.
+ * Gets the tab ID of the active tab in the current window.
+ * @returns {Promise<number|undefined>} Active tab ID, or undefined if not found.
  */
-
 async function getActiveTabId() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab?.id;
 }
+
 /**
- * Sends a message to the active tab to enable or disable the content.js script. 
- * @param {*} enabled 
+ * Sends a message to the active tab (if one exists).
+ * @param {string} type Message type (e.g., "MDE_SET_ENABLED")
+ * @param {boolean} enabled Toggle value to send
  */
-async function sendEnabledToTab(enabled) {
+async function sendToActiveTab(type, enabled) {
   const tabId = await getActiveTabId();
   if (!tabId) return;
-  chrome.tabs.sendMessage(tabId, { type: "MDE_SET_ENABLED", enabled });
+  chrome.tabs.sendMessage(tabId, { type, enabled });
 }
 
-/**
- * Event listener for DOMContentLoaded to initialize the popup UI and handle toggle changes.
- */
 document.addEventListener("DOMContentLoaded", async () => {
-  const toggle = document.getElementById("toggle");
-  const prereqToggle = document.getElementById("toggle-prereqs");
-  const notesToggle = document.getElementById("toggle-notes");
-  const lockToggle = document.getElementById("toggle-lockcards");
-  // Load saved settings
-  const { mdeEnabled = true, mdePrereqsEnabled = true } =
-    await chrome.storage.sync.get({ mdeEnabled: true, mdePrereqsEnabled: true });
+  // Grab UI elements
+  const toggleTitles = document.getElementById("toggle");
+  const togglePrereqs = document.getElementById("toggle-prereqs");
+  const toggleNotes = document.getElementById("toggle-notes");
+  const toggleLocks = document.getElementById("toggle-lockcards");
 
-  // Set initial UI states
-  toggle.checked = mdeEnabled;
-  prereqToggle.checked = mdePrereqsEnabled;
+  // Load saved settings (defaults = ON)
+  const {
+    mdeEnabled = true,
+    mdePrereqsEnabled = true,
+    mdeNotesEnabled = true,
+    mdeLockCardsEnabled = true,
+  } = await chrome.storage.sync.get({
+    mdeEnabled: true,
+    mdePrereqsEnabled: true,
+    mdeNotesEnabled: true,
+    mdeLockCardsEnabled: true,
+  });
 
-  // Full name feature toggle
-  toggle.addEventListener("change", async () => {
-    const enabled = toggle.checked;
+  // Initialize checkbox states
+  toggleTitles.checked = mdeEnabled;
+  togglePrereqs.checked = mdePrereqsEnabled;
+  toggleNotes.checked = mdeNotesEnabled;
+  toggleLocks.checked = mdeLockCardsEnabled;
+
+  // Full course titles toggle
+  toggleTitles.addEventListener("change", async () => {
+    const enabled = toggleTitles.checked;
     await chrome.storage.sync.set({ mdeEnabled: enabled });
-    await sendEnabledToTab(enabled);
+    await sendToActiveTab("MDE_SET_ENABLED", enabled);
   });
 
-  // Prereq feature toggle
-  prereqToggle.addEventListener("change", async () => {
-    const enabled = prereqToggle.checked;
+  // Prerequisite warnings toggle
+  togglePrereqs.addEventListener("change", async () => {
+    const enabled = togglePrereqs.checked;
     await chrome.storage.sync.set({ mdePrereqsEnabled: enabled });
-
-    const tabId = await getActiveTabId();
-    if (!tabId) return;
-
-    chrome.tabs.sendMessage(tabId, { type: "MDE_SET_PREREQS_ENABLED", enabled });
+    await sendToActiveTab("MDE_SET_PREREQS_ENABLED", enabled);
   });
-  
-  //Visibile notes toggle
-  const { mdeNotesEnabled = true } = await chrome.storage.sync.get({ mdeNotesEnabled: true });
-  notesToggle.checked = mdeNotesEnabled;
 
-  notesToggle.addEventListener("change", async () => {
-    const enabled = notesToggle.checked;
+  // Notes visibility toggle
+  toggleNotes.addEventListener("change", async () => {
+    const enabled = toggleNotes.checked;
     await chrome.storage.sync.set({ mdeNotesEnabled: enabled });
-
-    const tabId = await getActiveTabId();
-    if (!tabId) return;
-    chrome.tabs.sendMessage(tabId, { type: "MDE_SET_NOTES_ENABLED", enabled });
+    await sendToActiveTab("MDE_SET_NOTES_ENABLED", enabled);
   });
 
   // Lock cards toggle
-  const { mdeLockCardsEnabled = true } = await chrome.storage.sync.get({
-    mdeLockCardsEnabled: true,
-  });
-  lockToggle.checked = mdeLockCardsEnabled;
-
-  lockToggle.addEventListener("change", async () => {
-    const enabled = lockToggle.checked;
-
+  toggleLocks.addEventListener("change", async () => {
+    const enabled = toggleLocks.checked;
     await chrome.storage.sync.set({ mdeLockCardsEnabled: enabled });
-
-    const tabId = await getActiveTabId();
-    if (!tabId) return;
-    chrome.tabs.sendMessage(tabId, { type: "MDE_SET_LOCKCARDS_ENABLED", enabled });
+    await sendToActiveTab("MDE_SET_LOCKCARDS_ENABLED", enabled);
   });
 });
-

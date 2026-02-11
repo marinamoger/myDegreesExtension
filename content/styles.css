@@ -1,3 +1,7 @@
+/* ============================
+   Full course titles (Feature: titles)
+   ============================ */
+
 /* Full course title shown under course code */
 html.mde-enabled .mde-course-title {
   display: block;
@@ -8,6 +12,11 @@ html.mde-enabled .mde-course-title {
   margin-top: 2px;
 }
 
+/* When disabled, hide injected lines without removing them */
+html:not(.mde-enabled) .mde-course-title {
+  display: none;
+}
+
 /* Dark mode: slightly higher opacity so it stays readable */
 @media (prefers-color-scheme: dark) {
   html.mde-enabled .mde-course-title {
@@ -15,12 +24,10 @@ html.mde-enabled .mde-course-title {
   }
 }
 
-/* When disabled, hide injected lines without removing them */
-html:not(.mde-enabled) .mde-course-title {
-  display: none;
-}
+/* ============================
+   Prerequisite warnings (Feature: prereqs)
+   ============================ */
 
-/* Prerequisite warning badge */
 .mde-prereq-badge {
   position: absolute;
   right: 10px;
@@ -47,7 +54,7 @@ html:not(.mde-enabled) .mde-course-title {
   z-index: 10;
 }
 
-
+/* Tooltip (rendered from data-tooltip attribute) */
 .mde-prereq-badge::after {
   content: attr(data-tooltip);
 
@@ -63,7 +70,7 @@ html:not(.mde-enabled) .mde-course-title {
   border-radius: 10px;
 
   background: rgb(252, 207, 144);
-  color: #000000;
+  color: #000;
 
   font-size: 13px;
   font-weight: 500;
@@ -81,16 +88,17 @@ html:not(.mde-enabled) .mde-course-title {
   opacity: 1;
 }
 
-
 /* Dark mode tweak */
 @media (prefers-color-scheme: dark) {
   .mde-prereq-badge {
     background-color: #ef5350;
   }
-
 }
 
-/* Inline notes shown on course cards (to the left of the note icon, under divider) */
+/* ============================
+   Inline notes (Feature: notes)
+   ============================ */
+
 .mde-note-inline {
   position: absolute;
   left: 10px;
@@ -115,16 +123,22 @@ html:not(.mde-enabled) .mde-course-title {
   }
 }
 
-/* Lock button on each course card */
+/* ============================
+   Lock button (Feature: lockcards)
+   ============================ */
+
 .mde-lock-btn {
   position: absolute;
   top: 6px;
   right: 30px; /* space from 3-dot menu */
+
   border: none;
   background: transparent;
+
   cursor: pointer;
   padding: 4px;
   border-radius: 8px;
+
   z-index: 10;
 }
 
@@ -143,5 +157,3 @@ html:not(.mde-enabled) .mde-course-title {
   height: 18px;
   display: block;
 }
-
-

@@ -6,25 +6,41 @@
     <link rel="stylesheet" href="popup.css" />
     <title>MyDegrees Enhancer</title>
   </head>
+
   <body>
     <h1>MyDegrees Enhancer</h1>
-    <label class="row">
+
+    <div class="toggle-group">
+      <label class="row">
         <input id="toggle" type="checkbox" />
-        <span> Show full course titles</span>
-    </label>
-    <label class="row">
+        <span>Show full course titles</span>
+      </label>
+    </div>
+
+    <div class="toggle-group">
+      <label class="row">
         <input id="toggle-prereqs" type="checkbox" />
-        <span> Show missing prerequisite warnings</span>
-    </label>
-    <label class="row">
+        <span>Show missing prerequisite warnings</span>
+      </label>
+    </div>
+
+    <div class="toggle-group">
+      <label class="row">
         <input id="toggle-notes" type="checkbox" />
-        <span> Make notes visible</span>
-    </label>
-    <label class="row">
-      <input id="toggle-lockcards" type="checkbox" />
-      <span>Show locks</span>
-    </label>
-      <div class="toggle-subtext"> Prevents locked courses from being moved between terms.</div>
+        <span>Make notes visible</span>
+      </label>
+    </div>
+
+    <div class="toggle-group">
+      <label class="row">
+        <input id="toggle-lockcards" type="checkbox" />
+        <span>Show locks</span>
+      </label>
+      <div class="toggle-subtext">
+        Prevents locked courses from being moved between terms.
+      </div>
+    </div>
+
     <script src="popup.js"></script>
   </body>
 </html>

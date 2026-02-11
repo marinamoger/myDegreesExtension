@@ -1,27 +1,29 @@
 body {
   font-family: "Noto Sans", Helvetica, Arial, sans-serif;
   margin: 12px;
-  width: 360px;        
-  min-height: 220px;    
-  font-size: 14px;       
+  width: 360px;
+  min-height: 220px;
+  font-size: 14px;
   color: #111;
-  background: rgb(252, 207, 144);
+  background: rgb(255, 216, 162);
 }
 
 h1 {
   font-size: 15px;
   font-weight: 500;
   margin: 0 0 10px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.toggle-group {
+  margin-bottom: 12px;
 }
 
 .row {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.toggle-group {
-  margin-bottom: 12px;
 }
 
 .toggle-subtext {

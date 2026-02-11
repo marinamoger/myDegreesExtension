@@ -1,53 +1,81 @@
+/**
+ * Feature: lockcards
+ * Adds a lock icon on planner course cards. When locked, a card cannot be dragged
+ * (draggable="false") until unlocked.
+ */
 window.MDE.registerFeature({
   id: "lockcards",
-  
+
   async init() {
-    const LOCK_ENABLED_KEY = "mdeLockCardsEnabled";
+    /***********************
+     * Toggle state (popup)
+     ***********************/
     const ICON_LOCKED = chrome.runtime.getURL("assets/lock.png");
     const ICON_UNLOCKED = chrome.runtime.getURL("assets/unlock.png");
+
     let lockEnabled = true;
 
-    // Debounce re-processing when the DOM changes
+    /**
+     * Debounce re-processing when the DOM changes.
+     * Defined early because setLockEnabled() can call schedule().
+     */
     let timer = null;
+
     function schedule() {
-    if (!lockEnabled) return;        // don't run if feature disabled
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => processPage(), 200);
+      if (!lockEnabled) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => processPage(), 200);
     }
 
-
+    /**
+     * Apply enable/disable immediately:
+     * - disabled: remove injected buttons + restore dragging
+     * - enabled: schedule a pass
+     * @param {boolean} enabled
+     */
     function setLockEnabled(enabled) {
-    lockEnabled = Boolean(enabled);
+      lockEnabled = Boolean(enabled);
 
-    if (!lockEnabled) {
+      if (!lockEnabled) {
         // Remove injected buttons and restore dragging
         document.querySelectorAll(".mde-lock-btn").forEach((btn) => btn.remove());
-        document.querySelectorAll("#term-container div.MuiCard-root[draggable]").forEach((card) => {
-        card.setAttribute("draggable", "true");
-        card.classList.remove("mde-card-locked");
-        });
-    } else {
-        schedule(); // re-run processPage soon
-    }
+
+        document
+          .querySelectorAll("#term-container div.MuiCard-root[draggable]")
+          .forEach((card) => {
+            card.setAttribute("draggable", "true");
+            card.classList.remove("mde-card-locked");
+          });
+
+        return;
+      }
+
+      schedule();
     }
 
+    /**
+     * Initialize toggle state on page load from sync storage.
+     */
     async function initLockEnabledState() {
-    const { mdeLockCardsEnabled = true } = await chrome.storage.sync.get({
+      const { mdeLockCardsEnabled = true } = await chrome.storage.sync.get({
         mdeLockCardsEnabled: true,
-    });
-    setLockEnabled(mdeLockCardsEnabled);
+      });
+      setLockEnabled(mdeLockCardsEnabled);
     }
 
+    /**
+     * Live updates from popup without reload.
+     */
     chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === "MDE_SET_LOCKCARDS_ENABLED") {
+      if (msg?.type === "MDE_SET_LOCKCARDS_ENABLED") {
         setLockEnabled(msg.enabled);
-    }
+      }
     });
 
     await initLockEnabledState();
 
     /***********************
-     * Config
+     * Storage + DOM helpers
      ***********************/
     const LOCK_MAP_KEY = "mdeLockedCards_v1"; // chrome.storage.local
     const BTN_CLASS = "mde-lock-btn";
@@ -72,9 +100,8 @@ window.MDE.registerFeature({
 
     /**
      * Each card has a stable id embedded in the "More options..." button.
-     * Example earlier: aria-controls="action-menu-plan-requirement-CL-4bfff70e..."
+     * Example: aria-controls="action-menu-plan-requirement-CL-4bfff70e..."
      * We'll use the "CL-..." part as the unique key.
-     *
      * @param {Element} cardEl
      * @returns {string|null}
      */
@@ -86,7 +113,7 @@ window.MDE.registerFeature({
     }
 
     /**
-     * Apply lock state to card (the key behavior: toggle draggable)
+     * Apply lock state to a card by toggling draggable.
      * @param {Element} cardEl
      * @param {boolean} locked
      */
@@ -96,9 +123,27 @@ window.MDE.registerFeature({
     }
 
     /**
+     * Update lock icon visual (PNG).
+     * @param {Element} btn
+     * @param {boolean} locked
+     */
+    function setButtonVisual(btn, locked) {
+      let img = btn.querySelector("img");
+
+      if (!img) {
+        img = document.createElement("img");
+        img.alt = "";
+        img.className = "mde-lock-icon";
+        btn.textContent = "";
+        btn.appendChild(img);
+      }
+
+      img.src = locked ? ICON_LOCKED : ICON_UNLOCKED;
+      btn.setAttribute("data-locked", locked ? "1" : "0");
+    }
+
+    /**
      * Create or update the lock button on the card.
-     * Uses emoji to keep it simple (no assets).
-     *
      * @param {Element} cardEl
      * @param {string} cardId
      * @param {boolean} locked
@@ -114,7 +159,6 @@ window.MDE.registerFeature({
         btn.dataset.mdeCardId = cardId;
         btn.setAttribute("aria-label", "Lock/unlock this course card");
 
-        // Toggle lock on click
         btn.addEventListener("click", async (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -144,72 +188,50 @@ window.MDE.registerFeature({
     }
 
     /**
-     * Update lock icon visual
-     * @param {Element} btn
-     * @param {boolean} locked
-     */
-
-    function setButtonVisual(btn, locked) {
-    let img = btn.querySelector("img");
-    if (!img) {
-        img = document.createElement("img");
-        img.alt = "";
-        img.className = "mde-lock-icon";
-        btn.textContent = "";
-        btn.appendChild(img);
-    }
-
-  img.src = locked ? ICON_LOCKED : ICON_UNLOCKED;
-  btn.setAttribute("data-locked", locked ? "1" : "0");
-}
-
-
-    /**
-     * Process all course cards:
+     * Process all planner course cards:
      * - inject lock button
      * - enforce draggable based on stored lock state
      */
     async function processPage() {
-    if (!lockEnabled) return;
-    const map = await loadLockMap();
+      if (!lockEnabled) return;
 
-    // Narrow scope: only cards that are in the planner columns
-    const termContainer = document.querySelector("#term-container");
-    if (!termContainer) return;
+      const map = await loadLockMap();
 
-    const cards = Array.from(
-        termContainer.querySelectorAll('div.MuiCard-root[draggable]')
-    );
+      // Narrow scope: only cards in planner columns
+      const termContainer = document.querySelector("#term-container");
+      if (!termContainer) return;
 
-    for (const cardEl of cards) {
-        // Extra narrowing: must have the action-menu button (real course card)
+      const cards = Array.from(termContainer.querySelectorAll('div.MuiCard-root[draggable]'));
+
+      for (const cardEl of cards) {
+        // Extra narrowing: must have action-menu button (real course card)
         const cardId = getCardId(cardEl);
         if (!cardId) continue;
 
         const locked = Boolean(map[cardId]);
-
         upsertLockButton(cardEl, cardId, locked);
         applyLockedState(cardEl, locked);
-    }
+      }
     }
 
+    /***********************
+     * Start
+     ***********************/
 
-    // Initial run
     await processPage();
 
-    // Also retry a few times quickly because MyDegrees renders cards asynchronously
+    // Warmup: MyDegrees renders asynchronously; retry briefly
     let tries = 0;
-    const maxTries = 10;      // ~2 seconds total
+    const maxTries = 10; // ~2 seconds total
     const intervalMs = 200;
 
     const warmup = setInterval(async () => {
-    tries++;
-    await processPage();
+      tries++;
+      await processPage();
 
-    // Stop early once we’ve injected at least one button OR we hit max tries
-    if (document.querySelectorAll(".mde-lock-btn").length > 0 || tries >= maxTries) {
+      if (document.querySelectorAll(".mde-lock-btn").length > 0 || tries >= maxTries) {
         clearInterval(warmup);
-    }
+      }
     }, intervalMs);
 
     const obs = new MutationObserver(schedule);

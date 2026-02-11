@@ -1,58 +1,41 @@
 /**
  * Feature: Prerequisite warnings
- * - Fetches your class history (via /users/myself + /audit)
+ * - Fetches class history (via /users/myself + /audit)
  * - Fetches prereqs for scheduled courses (via /course-link/term)
  * - Adds a "!" badge to any course card whose prereqs are missing/out of order
- * - Can be toggled on/off from the popup, and the saved toggle state is applied on page load
+ * - Toggle state is read on page load and updated live from the popup
  */
 window.MDE.registerFeature({
   id: "prereqs",
 
-  // NOTE: init is async so we can read storage + fetch history/prereqs.
+  // init is async so we can read storage + fetch history/prereqs.
   async init() {
     /***********************
      * Config + Toggle State
      ***********************/
 
-    // Matches things like "CS 352", "ECE 271", "CS 261H"
     const COURSE_CODE_REGEX = /^[A-Z]{2,4}\s?\d{3}[A-Za-z]?$/;
-
-    // CSS class used by our badge element
     const BADGE_CLASS = "mde-prereq-badge";
 
-    // Feature toggle controlled by the popup
     let prereqsEnabled = true;
 
-    // Storage keys
     const HISTORY_KEY = "mdeHistoryCourses_v2";
     const HISTORY_META_KEY = "mdeHistoryMeta_v2"; // { studentId, savedAt }
     const PREREQ_KEY = "mdePrereqCache_v5";
 
-    // Refresh class history at most once per 24 hours
     const HISTORY_TTL_MS = 24 * 60 * 60 * 1000;
 
-    /**
-     * Apply enable/disable immediately:
-     * - When disabled: remove any existing badges
-     * - When enabled: schedule a fresh run (tick)
-     */
     function setPrereqsEnabled(enabled) {
       prereqsEnabled = Boolean(enabled);
 
       if (!prereqsEnabled) {
-        // If user turns this off, clean up the UI right away.
         document.querySelectorAll(`.${BADGE_CLASS}`).forEach((el) => el.remove());
         return;
       }
 
-      // If user turns this on, compute warnings again.
       scheduleTick();
     }
 
-    /**
-     * On page load, read the saved toggle state from sync storage and apply it.
-     * This is the equivalent of "initEnabledState()" in feature_titles.js.
-     */
     async function initPrereqsEnabledState() {
       const { mdePrereqsEnabled = true } = await chrome.storage.sync.get({
         mdePrereqsEnabled: true,
@@ -60,10 +43,6 @@ window.MDE.registerFeature({
       setPrereqsEnabled(mdePrereqsEnabled);
     }
 
-    /**
-     * Receive updates from the popup without reloading the page.
-     * Popup sends: { type: "MDE_SET_PREREQS_ENABLED", enabled: boolean }
-     */
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg?.type === "MDE_SET_PREREQS_ENABLED") {
         setPrereqsEnabled(msg.enabled);
@@ -74,17 +53,8 @@ window.MDE.registerFeature({
      * Prereq grouping
      ***********************/
 
-    /**
-     * Convert the prereq objects returned by /course-link/term into "OR groups":
-     * Example:
-     *   (CS 261 OR CS 261H) AND (ECE 271 OR CS 271)
-     * becomes:
-     *   [ ["CS 261","CS 261H"], ["ECE 271","CS 271"] ]
-     */
     function buildPrereqGroups(prereqObjs) {
-      /** @type {string[][]} */
       const groups = [];
-      /** @type {string[]} */
       let current = [];
 
       for (const p of prereqObjs || []) {
@@ -95,7 +65,6 @@ window.MDE.registerFeature({
         const startsGroup = (p.leftParenthesis || "").includes("(");
         const isAnd = p.connector === "A";
 
-        // Start a new group when a "(" begins or an AND connector is used
         if ((startsGroup || isAnd) && current.length) {
           groups.push(current);
           current = [];
@@ -103,7 +72,6 @@ window.MDE.registerFeature({
 
         current.push(code);
 
-        // Close group when ")" ends
         const endsGroup = (p.rightParenthesis || "").includes(")");
         if (endsGroup && current.length) {
           groups.push(current);
@@ -111,10 +79,7 @@ window.MDE.registerFeature({
         }
       }
 
-      // If something didn't end with ")", still keep it as a group
       if (current.length) groups.push(current);
-
-      // De-dupe within groups
       return groups.map((g) => Array.from(new Set(g)));
     }
 
@@ -134,7 +99,6 @@ window.MDE.registerFeature({
     }
 
     function ensureCardAnchor(cardEl) {
-      // Badge is positioned absolutely, so the card must be a positioned container.
       if (getComputedStyle(cardEl).position === "static") cardEl.style.position = "relative";
     }
 
@@ -149,7 +113,6 @@ window.MDE.registerFeature({
         cardEl.appendChild(badge);
       }
 
-      // Tooltip text is stored as an attribute and rendered via CSS ::after
       badge.setAttribute("data-tooltip", tooltip);
     }
 
@@ -163,12 +126,9 @@ window.MDE.registerFeature({
     }
 
     /***********************
-     * Term mapping (confirmed by you)
-     * Summer 2025 => 202600
-     * Fall 2025   => 202601
-     * Winter 2026 => 202602
-     * Spring 2026 => 202603
+     * Term mapping
      ***********************/
+
     function termLabelToCode(season, year) {
       const suffix = { Summer: "00", Fall: "01", Winter: "02", Spring: "03" }[season];
       if (!suffix) return null;
@@ -179,15 +139,9 @@ window.MDE.registerFeature({
     }
 
     /***********************
-     * Collect scheduled courses from planner
+     * Collect scheduled courses
      ***********************/
 
-    /**
-     * Reads the planner columns and returns:
-     * - items: list of scheduled course cards we can annotate
-     * - courseToIndex: courseCode -> termIndex (to compare ordering)
-     * - termIndexToLabel: termIndex -> "Fall 2025" (for tooltip)
-     */
     function collectScheduled() {
       const termContainer = document.querySelector("#term-container");
       if (!termContainer) {
@@ -203,7 +157,6 @@ window.MDE.registerFeature({
       for (let termIndex = 0; termIndex < columns.length; termIndex++) {
         const col = columns[termIndex];
 
-        // Find a season/year label somewhere in the column.
         const termEl = Array.from(col.querySelectorAll("h1,h2,h3,h4,p,span,div")).find((el) =>
           /\b(20\d{2})\s+(Fall|Winter|Spring|Summer)\b|\b(Fall|Winter|Spring|Summer)\s+(20\d{2})\b/.test(
             (el.textContent || "").trim()
@@ -232,7 +185,6 @@ window.MDE.registerFeature({
 
         termIndexToLabel.set(termIndex, termLabel);
 
-        // Course code elements (UI uses p[aria-label] where textContent is "CS 372")
         const courseEls = Array.from(col.querySelectorAll('p[aria-label]')).filter((el) =>
           COURSE_CODE_REGEX.test((el.textContent || "").trim())
         );
@@ -251,7 +203,7 @@ window.MDE.registerFeature({
     }
 
     /***********************
-     * MyDegrees API: user + audit -> class history set
+     * MyDegrees API: user + audit -> history set
      ***********************/
 
     async function fetchMyStudentId() {
@@ -282,11 +234,6 @@ window.MDE.registerFeature({
       return res.json();
     }
 
-    /**
-     * Walk the full audit JSON and extract the courses the student has taken/is taking.
-     * We collect any object that looks like a course record:
-     * { discipline:"CS", number:"352", recordType:"C", inProgress:"N", ... }
-     */
     function extractHistoryFromAudit(auditData) {
       const codes = new Set();
 
@@ -317,7 +264,6 @@ window.MDE.registerFeature({
       }
 
       walk(auditData);
-
       return new Set(Array.from(codes).map(normalizeCourseCode));
     }
 
@@ -348,16 +294,11 @@ window.MDE.registerFeature({
     }
 
     /***********************
-     * Prereq API (batch per term)
+     * Prereq API cache
      ***********************/
 
-    // courseCode -> string[][] (prereq OR-groups)
     let prereqCache = new Map();
 
-    /**
-     * Load prereq cache from local storage.
-     * This also supports older formats (flat arrays) by converting them into singleton groups.
-     */
     async function loadPrereqCache() {
       const saved = (await chrome.storage.local.get(PREREQ_KEY))[PREREQ_KEY];
       if (!saved || typeof saved !== "object") return;
@@ -365,13 +306,11 @@ window.MDE.registerFeature({
       const m = new Map();
 
       for (const [course, value] of Object.entries(saved)) {
-        // New format: string[][]
         if (Array.isArray(value) && Array.isArray(value[0])) {
           m.set(course, value);
           continue;
         }
 
-        // Old format: string[] -> convert to singleton groups
         if (Array.isArray(value) && typeof value[0] === "string") {
           m.set(course, value.map((code) => [code]));
           continue;
@@ -416,9 +355,6 @@ window.MDE.registerFeature({
     let timer = null;
     let initialized = false;
 
-    /**
-     * Ensure historySet is populated, using cache if it's fresh enough.
-     */
     async function ensureHistorySet() {
       const cached = await loadHistoryCache();
 
@@ -440,15 +376,12 @@ window.MDE.registerFeature({
       await saveHistoryCache(studentId, set);
     }
 
-    /**
-     * Fetch prereqs for any scheduled courses that aren't in prereqCache yet.
-     * We batch requests by termCode.
-     */
     async function ensurePrereqsForScheduled(items) {
       const termToParts = new Map();
 
       for (const it of items) {
         if (prereqCache.has(it.courseCode)) continue;
+
         const parts = splitCourseCode(it.courseCode);
         if (!parts) continue;
 
@@ -474,10 +407,6 @@ window.MDE.registerFeature({
       if (termToParts.size) await savePrereqCache();
     }
 
-    /**
-     * Decide which course cards should show a warning badge.
-     * Tooltip format: "Missing Prerequisite: X, Y, Z"
-     */
     function applyWarnings(items, courseToIndex, termIndexToLabel) {
       for (const it of items) {
         const groups = prereqCache.get(it.courseCode) || [];
@@ -485,14 +414,12 @@ window.MDE.registerFeature({
         const missingGroups = [];
         const laterMentions = [];
 
-        // Evaluate each OR-group: group satisfied if ANY option is satisfied
         for (const group of groups) {
           let groupSatisfied = false;
 
           for (const option of group) {
             const optIdx = courseToIndex.get(option);
 
-            // If prereq is scheduled later, it's not satisfied for this course.
             if (optIdx != null && optIdx > it.termIndex) {
               laterMentions.push({
                 code: option,
@@ -502,7 +429,6 @@ window.MDE.registerFeature({
             }
 
             const satisfied = historySet.has(option) || (optIdx != null && optIdx < it.termIndex);
-
             if (satisfied) {
               groupSatisfied = true;
               break;
@@ -512,22 +438,18 @@ window.MDE.registerFeature({
           if (!groupSatisfied) missingGroups.push(group);
         }
 
-        // No issues -> remove badge
         if (missingGroups.length === 0 && laterMentions.length === 0) {
           clearBadge(it.cardEl);
           continue;
         }
 
-        // Build "Missing Prerequisite: X, Y, Z"
         const missingSet = new Set();
 
         for (const group of missingGroups) {
           for (const code of group) missingSet.add(code);
         }
 
-        for (const x of laterMentions) {
-          missingSet.add(x.code);
-        }
+        for (const x of laterMentions) missingSet.add(x.code);
 
         if (missingSet.size === 0) {
           clearBadge(it.cardEl);
@@ -539,18 +461,10 @@ window.MDE.registerFeature({
       }
     }
 
-    /**
-     * One full pass:
-     * - make sure history is available (cached or fetched)
-     * - collect scheduled courses
-     * - fetch prereqs for those courses
-     * - apply badges
-     */
     async function tick() {
-      // "Guarding tick": if feature is disabled, do nothing.
       if (!prereqsEnabled) return;
-
       if (running) return;
+
       running = true;
 
       try {
@@ -566,37 +480,27 @@ window.MDE.registerFeature({
         await ensurePrereqsForScheduled(items);
         applyWarnings(items, courseToIndex, termIndexToLabel);
       } catch (e) {
-        // If something breaks, we fail quietly so the site still works.
-        // For debugging, uncomment:
+        // Fail quietly so the site remains usable.
+        // For debugging:
         // console.log("[MDE prereqs] error", e);
       } finally {
         running = false;
       }
     }
 
-    /**
-     * Debounce repeated DOM changes (MyDegrees updates the page constantly).
-     * We schedule tick a little later so we don't spam API calls.
-     */
     function scheduleTick() {
-      // Optional: don't even schedule work when disabled
       if (!prereqsEnabled) return;
-
       if (timer) clearTimeout(timer);
       timer = setTimeout(tick, 250);
     }
 
-  /**
-    * Start feature
-    */
+    /***********************
+     * Start feature
+     ***********************/
 
-    // IMPORTANT: apply saved toggle state on page load
     await initPrereqsEnabledState();
-
-    // Do an initial pass (only runs if enabled)
     tick();
 
-    // Re-run when the planner DOM changes
     const obs = new MutationObserver(scheduleTick);
     obs.observe(document.body, { childList: true, subtree: true });
   },

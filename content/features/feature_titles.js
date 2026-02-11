@@ -1,38 +1,59 @@
+/**
+ * Feature: titles
+ * Adds a permanent, title-cased course name under each course code.
+ */
 window.MDE.registerFeature({
   id: "titles",
+
   init() {
+    // Matches course codes like "CS 321", "MTH 251", "ECE 271"
     const COURSE_CODE_REGEX = /^[A-Z]{2,4}\s?\d{3}$/;
 
     /**
-     * Converts all-caps course title to title case, ignoring small words
-     * and stripping special characters
-     * @param {string} s 
-     * @returns {string} title-cased version of string s
+     * Converts all-caps course title to title case:
+     * - keeps small words lowercase (except at start)
+     * - preserves Roman numerals (I, II, III, IV...)
+     * - strips leading special characters
+     * @param {string} raw
+     * @returns {string}
      */
     function formatCourseTitle(raw) {
       const small = new Set(["and", "of", "to"]);
-      let s = (raw || "").trim().replace(/^[^A-Za-z0-9]+/, "").replace(/\s+/g, " ");
+
+      const s = (raw || "")
+        .trim()
+        .replace(/^[^A-Za-z0-9]+/, "")
+        .replace(/\s+/g, " ");
+
       if (!s) return s;
 
       return s
         .toLowerCase()
         .split(" ")
         .map((w, i) => {
-          if (/^[ivx]+$/.test(w)) return w.toUpperCase();   //roman numerals
-          if (i !== 0 && small.has(w)) return w;            //small words
-          return w.charAt(0).toUpperCase() + w.slice(1);    //capatalize first letter
+          // Roman numerals
+          if (/^[ivx]+$/.test(w)) return w.toUpperCase();
+
+          // Keep small words lowercase unless first word
+          if (i !== 0 && small.has(w)) return w;
+
+          // Capitalize first letter
+          return w.charAt(0).toUpperCase() + w.slice(1);
         })
         .join(" ");
     }
 
     /**
-     * Determines whether a DOM element (el) represents a course code in the myDegrees UI.
-     * @param {Element} el 
+     * True if this element looks like a course code in MyDegrees:
+     * - has an aria-label (used by the site for course title)
+     * - textContent matches a course code
+     * @param {Element} el
      * @returns {boolean}
      */
     function isCourseCodeElement(el) {
-      const aria = el.getAttribute("aria-label"); //"aria-label" is the attribute attached to course codes
+      const aria = el.getAttribute("aria-label");
       if (!aria) return false;
+
       const text = (el.textContent || "").trim();
       return COURSE_CODE_REGEX.test(text);
     }
@@ -68,11 +89,9 @@ window.MDE.registerFeature({
         el.insertAdjacentElement("afterend", line);
       }
 
-      // Mark processed *for this course code* (not just "1")
-      // This prevents stale titles when the DOM node gets reused for a different course.
+      // Mark processed for this course code (prevents stale titles on reused nodes)
       el.dataset.mdeProcessed = courseCode;
     }
-
 
     /**
      * Scans the page for candidate elements and enhances them.
@@ -85,14 +104,16 @@ window.MDE.registerFeature({
     }
 
     /**
-     * Enables or disables extension styles and behavior
-     * @param {boolean} enabled 
+     * Enables/disables injected title lines via the root HTML class.
+     * @param {boolean} enabled
      */
     function setEnabled(enabled) {
       document.documentElement.classList.toggle("mde-enabled", Boolean(enabled));
     }
 
-    // Initializes the enabled/disabled state of the extension on page load.
+    /**
+     * Initializes the saved enabled/disabled state on page load.
+     */
     async function initEnabledState() {
       const { mdeEnabled = true } = await chrome.storage.sync.get({ mdeEnabled: true });
       setEnabled(mdeEnabled);
@@ -102,13 +123,13 @@ window.MDE.registerFeature({
     processPage();
     initEnabledState();
 
-    // Keep applying when myDegrees updates
+    // Re-run when MyDegrees re-renders content
     const observer = new MutationObserver(() => processPage());
     observer.observe(document.body, { childList: true, subtree: true });
-    
-    // Allow popup to toggle without reloading the page
+
+    // Allow popup to toggle without reload
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg?.type === "MDE_SET_ENABLED") setEnabled(msg.enabled);
     });
-  }
+  },
 });

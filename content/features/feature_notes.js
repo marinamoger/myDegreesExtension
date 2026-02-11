@@ -1,3 +1,8 @@
+/**
+ * Feature: notes
+ * Displays course notes inline on each course card (when a note exists),
+ * and keeps a local cache updated based on the note dialog.
+ */
 window.MDE.registerFeature({
   id: "notes",
 
@@ -5,8 +10,7 @@ window.MDE.registerFeature({
     /***********************
      * Config
      ***********************/
-    const NOTES_ENABLED_KEY = "mdeNotesEnabled";
-    const NOTES_CACHE_KEY = "mdeNotesCache_v1"; // local-only cache: { "CS 325": "this is a note" }
+    const NOTES_CACHE_KEY = "mdeNotesCache_v1"; // local cache: { "CS 325": "note text" }
     const NOTE_CLASS = "mde-note-inline";
     const NOTE_BTN_SELECTOR = 'button[aria-label$=" Notes"]';
 
@@ -15,11 +19,12 @@ window.MDE.registerFeature({
     /***********************
      * Enable/disable wiring (popup toggle)
      ***********************/
+
     function setNotesEnabled(enabled) {
       notesEnabled = Boolean(enabled);
 
       if (!notesEnabled) {
-        // Hide immediately: remove any injected note boxes
+        // Remove injected note boxes immediately
         document.querySelectorAll(`.${NOTE_CLASS}`).forEach((n) => n.remove());
       } else {
         // Re-render notes from cache
@@ -43,13 +48,12 @@ window.MDE.registerFeature({
     /***********************
      * Cache helpers
      ***********************/
-    /** @returns {Promise<Record<string,string>>} */
+
     async function loadNotesCache() {
       const obj = (await chrome.storage.local.get(NOTES_CACHE_KEY))[NOTES_CACHE_KEY];
       return obj && typeof obj === "object" ? obj : {};
     }
 
-    /** @param {Record<string,string>} obj */
     async function saveNotesCache(obj) {
       await chrome.storage.local.set({ [NOTES_CACHE_KEY]: obj });
     }
@@ -62,13 +66,11 @@ window.MDE.registerFeature({
     function courseCodeFromNotesAria(aria) {
       const m = String(aria || "").match(/^([A-Z]{2,4}\s?\d{3}[A-Za-z]?)\s+Notes$/);
       if (!m) return null;
-      // normalize to "CS 325"
       return m[1].replace(/\s+/g, " ").trim();
     }
 
     /**
-     * Find the note dialog if it exists.
-     * MUI uses: role="dialog"
+     * Find an open note dialog (MUI uses role="dialog")
      * @returns {Element|null}
      */
     function findOpenNoteDialog() {
@@ -77,53 +79,53 @@ window.MDE.registerFeature({
 
     /**
      * Pull note text from the open dialog.
-     * Your screenshot shows the note displayed as a <p> that equals the note text.
-     * We also try textarea/input in case the dialog is in edit mode.
+     * Strategy:
+     *  1) textarea/input value (edit mode)
+     *  2) first <p> after divider (view mode)
+     *  3) final conservative fallback: last <p>
      * @param {Element} dialogEl
      * @returns {string}
      */
     function readNoteTextFromDialog(dialogEl) {
-    // 1. Prefer editable controls 
-    const textarea = dialogEl.querySelector("textarea");
-    if (textarea && typeof textarea.value === "string") {
+      // 1) Prefer editable controls
+      const textarea = dialogEl.querySelector("textarea");
+      if (textarea && typeof textarea.value === "string") {
         return textarea.value.trim();
-    }
+      }
 
-    const input = dialogEl.querySelector('input[type="text"], input:not([type])');
-    if (input && typeof input.value === "string") {
+      const input = dialogEl.querySelector('input[type="text"], input:not([type])');
+      if (input && typeof input.value === "string") {
         return input.value.trim();
-    }
+      }
 
-    // 2. Look for note text AFTER the divider
-    const divider = dialogEl.querySelector(".MuiDivider-root");
-
-    if (divider) {
+      // 2) Look for note text after the divider
+      const divider = dialogEl.querySelector(".MuiDivider-root");
+      if (divider) {
         let el = divider.nextElementSibling;
         while (el) {
-        if (el.tagName === "P") {
+          if (el.tagName === "P") {
             const text = (el.textContent || "").trim();
             if (text) return text;
+          }
+          el = el.nextElementSibling;
         }
-        el = el.nextElementSibling;
-        }
-    }
+      }
 
-    // 3. Final fallback (very conservative)
-    const paragraphs = Array.from(dialogEl.querySelectorAll("p"));
-    const last = paragraphs[paragraphs.length - 1];
-    return last ? (last.textContent || "").trim() : "";
+      // 3) Final fallback (conservative)
+      const paragraphs = Array.from(dialogEl.querySelectorAll("p"));
+      const last = paragraphs[paragraphs.length - 1];
+      return last ? (last.textContent || "").trim() : "";
     }
-
 
     /**
-     * Show inline note on a card (bottom-left area under divider).
-     * We position it absolutely so we don't have to perfectly match their internal layout.
+     * Insert/update the inline note box within a card.
      * @param {Element} cardEl
      * @param {string} text
      */
     function upsertInlineNote(cardEl, text) {
-      // Ensure positioning context
-      if (getComputedStyle(cardEl).position === "static") cardEl.style.position = "relative";
+      if (getComputedStyle(cardEl).position === "static") {
+        cardEl.style.position = "relative";
+      }
 
       let box = cardEl.querySelector(`.${NOTE_CLASS}`);
       if (!text) {
@@ -142,7 +144,7 @@ window.MDE.registerFeature({
     }
 
     /**
-     * Get all course cards on the planner (draggable=true in your HTML).
+     * Get all planner course cards (draggable=true in your UI).
      * @returns {Element[]}
      */
     function getPlannerCards() {
@@ -150,7 +152,7 @@ window.MDE.registerFeature({
     }
 
     /**
-     * For each card, if we have a cached note for its course code, show it.
+     * For each course card, show an inline note if we have one cached.
      */
     async function renderNotesFromCache() {
       if (!notesEnabled) return;
@@ -170,11 +172,12 @@ window.MDE.registerFeature({
     }
 
     /***********************
-     * Capture notes whenever user opens/closes/edits the dialog
+     * Capture notes from the dialog (when user opens/edits it)
      ***********************/
+
     let lastClickedCourse = null;
 
-    // Track which course's note dialog we opened by listening to clicks on note buttons
+    // Track which course's note dialog we opened (by clicking its note button)
     document.addEventListener("click", (e) => {
       const btn = e.target?.closest?.(NOTE_BTN_SELECTOR);
       if (!btn) return;
@@ -184,8 +187,8 @@ window.MDE.registerFeature({
     });
 
     /**
-     * When a dialog is open, read its note text and store it for lastClickedCourse.
-     * This is intentionally simple and runs on a debounce.
+     * If a note dialog is open, read its text and store it for lastClickedCourse.
+     * Runs on a debounce for simplicity.
      */
     async function syncFromOpenDialogIfAny() {
       if (!notesEnabled) return;
@@ -195,30 +198,25 @@ window.MDE.registerFeature({
       if (!dialog) return;
 
       const text = readNoteTextFromDialog(dialog);
-
       const cache = await loadNotesCache();
 
-      if (text) {
-        cache[lastClickedCourse] = text;
-      } else {
-        // If note is empty, remove it from cache
-        delete cache[lastClickedCourse];
-      }
+      if (text) cache[lastClickedCourse] = text;
+      else delete cache[lastClickedCourse];
 
       await saveNotesCache(cache);
-
-      // Update cards immediately
       await renderNotesFromCache();
     }
 
     /***********************
      * Debounced tick wiring
      ***********************/
+
     let timer = null;
 
     function scheduleTick() {
       if (!notesEnabled) return;
       if (timer) clearTimeout(timer);
+
       timer = setTimeout(async () => {
         await renderNotesFromCache();
         await syncFromOpenDialogIfAny();
@@ -228,6 +226,7 @@ window.MDE.registerFeature({
     /***********************
      * Start
      ***********************/
+
     await initNotesEnabledState();
     await renderNotesFromCache();
 
